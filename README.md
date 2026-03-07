@@ -77,6 +77,9 @@ deny   192.168.1.56 0.0.0.3
 permit any
 ```
 
+### Known Limitation
+Current ACL implementation uses standard ACLs. A known limitation is that return traffic from restricted subnets is also blocked — for example, a Manager can send a ping to an Employee host, but the reply is dropped because it is sourced from the Employee subnet which is denied. A future improvement would be extended ACLs applied inbound on the source subinterface, or a stateful firewall, to enforce unidirectional restrictions properly.
+
 ---
 
 ## Design Decisions
@@ -123,6 +126,30 @@ DHCP Snooping builds a binding table of legitimate IP-to-MAC-to-port mappings. D
 
 ---
 
+## Challenges & Troubleshooting
+
+**1. Switch did not support PoE**
+Initially used a Cisco 2960 switch, but it does not support PoE which was required to power the Cisco 7960 IP phones. Switched to the Cisco 3560-24PS multilayer switch which supports PoE. PoE was enabled by default on the MLS.
+
+**2. DHCP stopped working after enabling DHCP Snooping**
+After enabling DHCP Snooping, clients were no longer receiving IP addresses. After investigating, recalled from Jeremy's IT Lab that enabling DHCP with trunking can cause the switch to insert Option 82 (relay agent information) into DHCP packets. Untrusted ports reject packets containing Option 82 by default, which was dropping the DHCP Discover packets before they reached the router. Resolved by disabling Option 82 insertion on the switch, after which DHCP worked correctly.
+
+**3. SSH into the switch stopped working (suspected Packet Tracer bug)**
+SSH into the router was working fine but SSH into the switch was not. Used traceroute and confirmed traffic was reaching the default gateway of the management network. Was able to ping the default gateway (`192.168.1.57`) but could not reach the switch SVI (`192.168.1.58`). Investigated ACL, interface status, trunk configuration, and all other relevant settings — nothing was misconfigured. Performed shutdown/no shutdown on the SVI, restarted both devices, and even rebuilt the management network from scratch — none of which resolved the issue. Concluded this is a Packet Tracer simulation bug where the SVI fails to process traffic correctly between sessions despite appearing up in the configuration.
+
+---
+
+## Testing the Project
+
+To download and test this project in Cisco Packet Tracer, use the following credentials for SSH or console access on both the router and switch:
+
+| Field | Value |
+|---|---|
+| Username | `admin` |
+| Password | `admin` |
+
+---
+
 ## Future Improvements
 
 1. **Redundancy** — Add a second switch and uplink for high availability; implement EtherChannel or HSRP
@@ -141,7 +168,7 @@ DHCP Snooping builds a binding table of legitimate IP-to-MAC-to-port mappings. D
 
 ---
 
-## Author
+## Author - Kimon Pandit Chhetri
 
 Built as a portfolio project simulating a real-world small enterprise network.  
 *Authorized Users Only.*
